@@ -244,10 +244,21 @@ NSString *const MGJRouterParameterUserInfo = @"MGJRouterParameterUserInfo";
     }
     
     // Extract Params From Query.
-    NSArray<NSURLQueryItem *> *queryItems = [[NSURLComponents alloc] initWithURL:[[NSURL alloc] initWithString:url] resolvingAgainstBaseURL:false].queryItems;
-    
-    for (NSURLQueryItem *item in queryItems) {
-        parameters[item.name] = item.value;
+    if (@available(iOS 11.0, *)) {
+        NSArray<NSURLQueryItem *> *queryItems = [[NSURLComponents alloc] initWithURL:[[NSURL alloc] initWithString:url] resolvingAgainstBaseURL:false].percentEncodedQueryItems;
+
+        for (NSURLQueryItem *item in queryItems) {
+            parameters[item.name] = item.value;
+        }
+    } else {
+        NSDictionary *queryDic = [self dictionaryFromURL:url];
+        if (queryDic) {
+            [queryDic enumerateKeysAndObjectsUsingBlock:^(id  _Nonnull key, id  _Nonnull obj, BOOL * _Nonnull stop) {
+                if (key && obj && [obj isKindOfClass:[NSString class]]) {
+                    parameters[key] = obj;
+                }
+            }];
+        }
     }
 
     if (subRoutes[@"_"]) {
@@ -255,6 +266,34 @@ NSString *const MGJRouterParameterUserInfo = @"MGJRouterParameterUserInfo";
     }
     
     return parameters;
+}
+
+- (NSDictionary *)dictionaryFromURL:(NSString *)urlStr {
+    if (urlStr && urlStr.length && [urlStr rangeOfString:@"?"].length == 1) {
+        NSArray *array = [urlStr componentsSeparatedByString:@"?"];
+        if (array && array.count == 2) {
+            NSString *paramsStr = array[1];
+            if (paramsStr.length) {
+                NSMutableDictionary *paramsDict = [NSMutableDictionary dictionary];
+                NSArray *paramArray = [paramsStr componentsSeparatedByString:@"&"];
+                for (NSString *param in paramArray) {
+                    if (param && param.length) {
+                        NSArray *parArr = [param componentsSeparatedByString:@"="];
+                        if (parArr.count == 2) {
+                            [paramsDict setObject:parArr[1] forKey:parArr[0]];
+                        }
+                    }
+                }
+                return paramsDict;
+            } else {
+                return nil;
+            }
+        } else {
+            return nil;
+        }
+    } else {
+        return nil;
+    }
 }
 
 - (void)removeURLPattern:(NSString *)URLPattern
